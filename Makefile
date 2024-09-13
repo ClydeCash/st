@@ -12,7 +12,7 @@ all: st
 .c.o:
 	$(CC) $(STCFLAGS) -c $<
 
-st.o: config.h st.h win.h normalMode.h normalMode.c utils.h
+st.o: config.h st.h win.h
 x.o: arg.h config.h st.h win.h
 boxdraw.o: config.h st.h boxdraw_data.h
 

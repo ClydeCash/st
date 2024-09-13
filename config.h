@@ -5,11 +5,11 @@
  *
  * font: see http://freedesktop.org/software/fontconfig/fontconfig-user.html
  */
-static char *font = "Expressa Terminal:pixelsize=10:antialias=true:autohint=true";
 /* Spare fonts */
-static char *font2[] = {"Noto Color Emoji:pixelsize=10:antialias=true:autohint=true"
+static char *font2[] = {
+	"Noto Color Emoji:pixelsize=10:antialias=true:autohint=true",
 };
-
+static char *font = "Expressa Terminal:pixelsize=10:antialias=true:autohint=true";
 static int borderpx = 2;
 
 /*
@@ -114,6 +114,7 @@ float alpha = 0.8;
 
 /* Terminal colors (16 first used in escape sequence) */
 static const char *colorname[] = {
+
 	/* 8 normal colors */
 	"232323",
 	"c32a2a",
@@ -123,7 +124,7 @@ static const char *colorname[] = {
 	"db34ff",
 	"15a4ff",
 	"c8c8c8",
-	
+
 	/* 8 bright colors */
 	"656565",
 	"f43535",
@@ -136,12 +137,11 @@ static const char *colorname[] = {
 	[255] = 0,
 
 	/* more colors can be added after 255 to use with DefaultXX */
-	"#f0f0f0",
-	"#f0f0f0",
-	"#232323", /* default foreground colour */
-	"#f0f0f0", /* default background colour */
+	"#f0f0f0", /* default foreground color */
+	"#232323", /* default background color */
+	"#f0f0f0", /* default cursor color */
+	"#525252", /* default reverse cursor color */
 };
-
 
 /*
  * Default colors (colorname index)
@@ -150,39 +150,16 @@ static const char *colorname[] = {
 unsigned int defaultfg = 15;
 unsigned int defaultbg = 0;
 unsigned int defaultcs = 15;
-static unsigned int defaultrcs = 15;
-unsigned int background = 0;
-unsigned int const currentBg = 6, buffSize = 2048;
-/// Enable double / triple click yanking / selection of word / line.
-int const mouseYank = 1, mouseSelect = 0;
-/// [Vim Browse] Colors for search results currently on screen.
-unsigned int const highlightBg = 160, highlightFg = 15;
-char const wDelS[] = "!\"#$%&'()*+,-./:;<=>?@[\\]^`{|}~", wDelL[] = " \t";
-char *nmKeys [] = {              ///< Shortcusts executed in normal mode
-  "R/Building\nN", "r/Building\n", "X/juli@machine\nN", "x/juli@machine\n",
-  "Q?[Leaving vim, starting execution]\n","F/: error:\nN", "f/: error:\n", "DQf"
-};
-unsigned int const amountNmKeys = sizeof(nmKeys) / sizeof(*nmKeys);
-/// Style of the {command, search} string shown in the right corner (y,v,V,/)
-Glyph styleSearch = {' ', ATTR_ITALIC | ATTR_BOLD_FAINT, 7, 16};
-Glyph style[] = {{' ',ATTR_ITALIC|ATTR_FAINT,15,16}, {' ',ATTR_ITALIC,232,11},
-                 {' ', ATTR_ITALIC, 232, 4}, {' ', ATTR_ITALIC, 232, 12}};
+static unsigned int defaultrcs = 8;
 
 /*
- * https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h4-Functions-using-CSI-_-ordered-by-the-final-character-lparen-s-rparen:CSI-Ps-SP-q.1D81
- * Default style of cursor
- * 0: blinking block
- * 1: blinking block (default)
- * 2: steady block ("█")
- * 3: blinking underline
- * 4: steady underline ("_")
- * 5: blinking bar
- * 6: steady bar ("|")
- * 7: blinking st cursor
- * 8: steady st cursor
+ * Default shape of cursor
+ * 2: Block ("█")
+ * 4: Underline ("_")
+ * 6: Bar ("|")
+ * 7: Snowman ("☃")
  */
-static unsigned int cursorstyle = 0;
-static Rune stcursor = 0x2603; /* snowman ("☃") */
+static unsigned int cursorshape = 2;
 
 /*
  * Default columns and rows numbers
@@ -195,14 +172,14 @@ static unsigned int rows = 24;
  * Default colour and shape of the mouse cursor
  */
 static unsigned int mouseshape = XC_xterm;
-static unsigned int mousefg = 15;
+static unsigned int mousefg = 7;
 static unsigned int mousebg = 0;
 
 /*
  * Color used to display font attributes when fontconfig selected a font which
  * doesn't match the ones requested.
  */
-static unsigned int defaultattr = 15;
+static unsigned int defaultattr = 11;
 
 /*
  * Force mouse select/shortcuts while mask is active (when MODE_MOUSE is set).
@@ -232,9 +209,9 @@ ResourcePref resources[] = {
 		{ "color13",      STRING,  &colorname[13] },
 		{ "color14",      STRING,  &colorname[14] },
 		{ "color15",      STRING,  &colorname[15] },
-		{ "background",   STRING,  &colorname[0] },
-		{ "foreground",   STRING,  &colorname[15] },
-		{ "cursorColor",  STRING,  &colorname[15] },
+		{ "background",   STRING,  &colorname[256] },
+		{ "foreground",   STRING,  &colorname[257] },
+		{ "cursorColor",  STRING,  &colorname[258] },
 		{ "termname",     STRING,  &termname },
 		{ "shell",        STRING,  &shell },
 		{ "minlatency",   INTEGER, &minlatency },
@@ -251,14 +228,22 @@ ResourcePref resources[] = {
  * Internal mouse shortcuts.
  * Beware that overloading Button1 will disable the selection.
  */
+
+const unsigned int mousescrollincrement = 1;
 static MouseShortcut mshortcuts[] = {
 	/* mask                 button   function        argument       release */
+	{ XK_ANY_MOD,           Button4, kscrollup,      {.i = mousescrollincrement} },
+	{ XK_ANY_MOD,           Button5, kscrolldown,    {.i = mousescrollincrement} },
+};
+
+/* Disabled */
+/*
 	{ XK_ANY_MOD,           Button2, selpaste,       {.i = 0},      1 },
 	{ ShiftMask,            Button4, ttysend,        {.s = "\033[5;2~"} },
 	{ XK_ANY_MOD,           Button4, ttysend,        {.s = "\031"} },
 	{ ShiftMask,            Button5, ttysend,        {.s = "\033[6;2~"} },
 	{ XK_ANY_MOD,           Button5, ttysend,        {.s = "\005"} },
-};
+*/
 
 /* Internal keyboard shortcuts. */
 #define MODKEY Mod1Mask
@@ -266,20 +251,27 @@ static MouseShortcut mshortcuts[] = {
 
 static Shortcut shortcuts[] = {
 	/* mask                 keysym          function        argument */
-	{ XK_ANY_MOD,           XK_Break,       sendbreak,      {.i =  0} },
-	{ ControlMask,          XK_Print,       toggleprinter,  {.i =  0} },
-	{ ShiftMask,            XK_Print,       printscreen,    {.i =  0} },
-	{ XK_ANY_MOD,           XK_Print,       printsel,       {.i =  0} },
-	{ TERMMOD,              XK_Prior,       zoom,           {.f = +1} },
-	{ TERMMOD,              XK_Next,        zoom,           {.f = -1} },
-	{ TERMMOD,              XK_Home,        zoomreset,      {.f =  0} },
-	{ TERMMOD,              XK_C,           clipcopy,       {.i =  0} },
-	{ TERMMOD,              XK_V,           clippaste,      {.i =  0} },
-	{ TERMMOD,              XK_Y,           selpaste,       {.i =  0} },
-	{ ShiftMask,            XK_Insert,      selpaste,       {.i =  0} },
-	{ TERMMOD,              XK_Num_Lock,    numlock,        {.i =  0} },
-	{ MODKEY,               XK_c,           normalMode,     {.i =  0} },
+	{ XK_ANY_MOD,           XK_Break,		sendbreak,      {.i =  0} },
+	{ MODKEY,		XK_equal,		zoom,           {.f = +1} },
+	{ MODKEY,		XK_minus,		zoom,           {.f = -1} },
+	{ MODKEY,		XK_0,			zoomreset,      {.f =  0} },
+	{ MODKEY,		XK_y,			clipcopy,       {.i =  0} },
+	{ MODKEY,		XK_p,			clippaste,      {.i =  0} },
+	{ TERMMOD,		XK_Num_Lock,		numlock,        {.i =  0} },
+	{ MODKEY,		XK_k,			kscrollup,      {.i =  1} },
+    	{ MODKEY,		XK_j,			kscrolldown,	{.i =  1} },
+	{ MODKEY,		XK_u,			kscrollup,      {.i = -1} },
+    	{ MODKEY,		XK_d,			kscrolldown,	{.i = -1} },
 };
+
+/* Disabled */
+/*
+	{ ControlMask,		XK_Print,		toggleprinter,	{.i =  0} },
+	{ ShiftMask,		XK_Print,		printscreen,	{.i =  0} },
+	{ XK_ANY_MOD,		XK_Print,		printsel,	{.i =  0} },
+	{ TERMMOD,		XK_Y,			selpaste,	{.i =  0} },
+	{ ShiftMask,		XK_Insert,		selpaste,	{.i =  0} },
+*/
 
 /*
  * Special keys (change & recompile st.info accordingly)
@@ -550,14 +542,3 @@ static char ascii_printable[] =
 	" !\"#$%&'()*+,-./0123456789:;<=>?"
 	"@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_"
 	"`abcdefghijklmnopqrstuvwxyz{|}~";
-
-/*
- * Open urls starting with urlprefixes, contatining urlchars
- * by passing as ARG1 to urlhandler.
- */
-char* urlhandler = "xdg-open";
-char urlchars[] =
-	"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	"abcdefghijklmnopqrstuvwxyz"
-	"0123456789-._~:/?#@!$&'*+,;=%";
-char* urlprefixes[] = {"http://", "https://", NULL};
