@@ -9,7 +9,7 @@
 static char *font2[] = {
 	"Noto Color Emoji:pixelsize=10:antialias=true:autohint=true",
 };
-static char *font = "Expressa Terminal:pixelsize=10:antialias=true:autohint=true";
+static char *font = "Expressa Terminal:pixelsize=10";
 static int borderpx = 2;
 
 /*
